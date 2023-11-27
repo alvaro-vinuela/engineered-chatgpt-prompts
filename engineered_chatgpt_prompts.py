@@ -5,10 +5,10 @@ by the chatgpt model to generate the output text.
 """
 
 # import asyncio
-import openai
 import os
+import openai
 from dotenv import load_dotenv, find_dotenv
-from PyQt5.QtWidgets import (QApplication,
+from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
                              QWidget,
                              QVBoxLayout,
                              QHBoxLayout,
@@ -30,11 +30,15 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 
 
 async def get_completion(prompt, model="gpt-3.5-turbo"):
+    """
+    method to query openai API
+    """
     messages = [{"role": "user", "content": prompt}]
     chat = None
     try:
         # chat = await client.chat.completions.create(
-        chat = openai.ChatCompletion.create(
+        chat = openai.ChatCompletion.create(  # pylint: disable=no-member
+
             model=model,
             messages=messages,
             temperature=0,
@@ -45,12 +49,15 @@ async def get_completion(prompt, model="gpt-3.5-turbo"):
         return None
 
     if chat is None:
-        print(f"Invalid Response")
+        print("Invalid Response")
         return None
     return chat.choices[0].message["content"]
 
 
-class EngineeredChatgptPrompts(QWidget):
+class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-attributes
+    """
+    class to hold widgets and preocess method of main application
+    """
     def __init__(self):
         super().__init__()
 
@@ -114,7 +121,8 @@ class EngineeredChatgptPrompts(QWidget):
         self.show()
 
     def process_text(self):
-        input = self.input_text.toPlainText()
+        """ send engineered prompt to openai API and set result on output """
+        input_text = self.input_text.toPlainText()
         goal = self.goal_text.toPlainText()
         # Perform processing on the input text (replace with your own logic)
         if len(goal) < 2:
@@ -122,36 +130,39 @@ class EngineeredChatgptPrompts(QWidget):
         complete_prompt = (f"with the following goal "
                            f"(delimited by triple backticks): ```{goal}```"
                            f"process the following text with specified goal"
-                           f"(delimited by triple backticks): ```{input}```")
+                           f"(delimited by triple backticks): ```{input_text}```")
         processed_text = get_completion(complete_prompt)
         processed_text = f'Processed Text:\n{processed_text}'
         self.output_text.setText(processed_text)
 
     def load_goal(self):
-        # open a dialog inspecting text files on current folder
+        """ open a dialog inspecting text files on file system """
         filename = QFileDialog.getOpenFileName(self,
                                                'Open File',
                                                '.',
                                                'Text Files (*.txt)')
         if filename[0]:
-            with open(filename[0], 'r') as f:
+            with open(filename[0], 'r', encoding='utf-8') as f:
                 file_text = f.read()
                 self.goal_text.setText(file_text)
 
     def save_goal(self):
+        """ save goal text into system file """
         filename = QFileDialog.getSaveFileName(self,
                                                'Save File',
                                                '.',
                                                'Text Files (*.txt)')
         if filename[0]:
-            with open(filename[0], 'w') as f:
+            with open(filename[0], 'w', encoding='utf-8') as f:
                 my_text = self.goal_text.toPlainText()
                 f.write(my_text)
 
     def clear_goal(self):
+        """ clean goal text box """
         self.goal_text.setText('')
 
     def clear_input(self):
+        """ clean input text box """
         self.input_text.setText('')
 
 
