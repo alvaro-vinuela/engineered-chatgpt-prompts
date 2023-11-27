@@ -6,6 +6,7 @@ by the chatgpt model to generate the output text.
 
 # import asyncio
 import os
+import traceback
 import openai
 from dotenv import load_dotenv, find_dotenv
 from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
@@ -29,7 +30,8 @@ openai.organization = os.getenv('OPENAI_ORGANIZATION')
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 
-async def get_completion(prompt, model="gpt-3.5-turbo"):
+# async def get_completion(prompt, model="gpt-3.5-turbo"):
+def get_completion(prompt, model="gpt-3.5-turbo"):
     """
     method to query openai API
     """
@@ -46,6 +48,7 @@ async def get_completion(prompt, model="gpt-3.5-turbo"):
         )
     except openai.error.InvalidRequestError as err:
         print(f"InvalidRequestError: {err}")
+        print(f"Traceback: {traceback.print_exc()}")
         return None
 
     if chat is None:
