@@ -7,7 +7,7 @@ by the chatgpt model to generate the output text.
 import asyncio
 import os
 import sys
-
+import traceback
 import openai
 from dotenv import load_dotenv, find_dotenv
 from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
@@ -21,9 +21,10 @@ from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
 
 _ = load_dotenv(find_dotenv())  # read local .env file
 
-openai.api_key = os.getenv('OPENAI_API_KEY')
-openai.organization = os.getenv('OPENAI_ORGANIZATION')
-response = ""
+client = openai.AsyncOpenAI(
+    api_key=os.getenv('OPENAI_API_KEY'),
+    organization=os.getenv('OPENAI_ORGANIZATION'),
+)
 
 print("OpenAI version:", openai.__version__)
 
@@ -35,26 +36,41 @@ async def get_completion(prompt,
     method to query openai API
     """
     messages = [{"role": "user", "content": prompt}]
-    chat = openai.ChatCompletion.create(
+    chat = None
+    try:
+        # chat = openai.ChatCompletion.create(
+        chat = await client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0,
-            # stream=True,
+            stream=True,
             # this is the randomness degree of the model's output
         )
 
+    except openai.APIConnectionError as e:
+        print("The server could not be reached")
+        print(e.__cause__)  # an underlying Exception, likely raised within http
+    except openai.RateLimitError as e:
+        print("A 429 status code was received; we should back off a bit.")
+    except openai.APIStatusError as e:
+        print("Another non-200-range status code was received")
+        print(e.status_code)
+        print(e.response)
+        return None
 
-    global response
-    response = chat.choices[0].message["content"]
-    sys.stdout.write(f"\r{response}>")
-    sys.stdout.flush()
+    response = ""
+    async for part in chat:
+        response += part.choices[0].delta.content or ""
+        sys.stdout.write(f"\r{response}>")
+        sys.stdout.flush()
+        # print(response)
     return response
 
 
 class EngineeredChatgptPrompts(
     QWidget):  # pylint: disable=too-many-instance-attributes
     """
-    class to hold widgets and process method of main application
+    class to hold widgets and preocess method of main application
     """
 
     def __init__(self):
@@ -131,8 +147,6 @@ class EngineeredChatgptPrompts(
                            f"process the following text with specified goal"
                            f"(delimited by triple backticks): ```{input_text}```")
         asyncio.run(get_completion(complete_prompt))
-        global response
-        self.output_text.setPlainText(response)
 
     def load_goal(self):
         """ open a dialog inspecting text files on file system """
