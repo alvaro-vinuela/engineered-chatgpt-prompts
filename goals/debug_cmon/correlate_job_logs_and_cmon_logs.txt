@@ -1,0 +1,1 @@
+according to following logs provided (---cmon log--- and ---job log--- separated by '------' string), what happend on cmon  at the same time that there where errors on the job

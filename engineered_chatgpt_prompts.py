@@ -150,7 +150,10 @@ class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-at
                                                '.',
                                                'Text Files (*.txt)')
         if filename[0]:
-            with open(filename[0], 'w', encoding='utf-8') as f:
+            file = filename[0]
+            if not filename[0].endswith('.txt'):
+                file += '.txt'
+            with open(file, 'w', encoding='utf-8') as f:
                 my_text = self.goal_text.toPlainText()
                 f.write(my_text)
 
