@@ -23,9 +23,10 @@ _ = load_dotenv(find_dotenv())  # read local .env file
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 openai.organization = os.getenv('OPENAI_ORGANIZATION')
-response = ""
 
 print("OpenAI version:", openai.__version__)
+last_response = "" # pylint: disable=invalid-name,redefined-outer-name
+
 
 
 # def get_completion(prompt, model="gpt-3.5-turbo"):
@@ -36,23 +37,20 @@ async def get_completion(prompt,
     """
     messages = [{"role": "user", "content": prompt}]
     chat = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-            temperature=0,
-            # stream=True,
-            # this is the randomness degree of the model's output
-        )
-
-
-    global response
-    response = chat.choices[0].message["content"]
-    sys.stdout.write(f"\r{response}>")
+        model=model,
+        messages=messages,
+        temperature=0,
+        # stream=True,
+        # this is the randomness degree of the model's output
+    )
+    global last_response  # pylint: disable=global-statement
+    last_response = chat.choices[0].message["content"]  # pylint: disable=invalid-name,redefined-outer-name
+    sys.stdout.write(f"\r{last_response}>")
     sys.stdout.flush()
-    return response
+    return last_response
 
 
-class EngineeredChatgptPrompts(
-    QWidget):  # pylint: disable=too-many-instance-attributes
+class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-attributes
     """
     class to hold widgets and process method of main application
     """
@@ -126,13 +124,13 @@ class EngineeredChatgptPrompts(
         # Perform processing on the input text (replace with your own logic)
         if len(goal) < 2:
             goal = "summarize in 2 sentence"
-        complete_prompt = (f"with the following goal "
-                           f"(delimited by triple backticks): ```{goal}```"
-                           f"process the following text with specified goal"
-                           f"(delimited by triple backticks): ```{input_text}```")
-        asyncio.run(get_completion(complete_prompt))
-        global response
-        self.output_text.setPlainText(response)
+        full_prompt = (f"with the following goal "
+                       f"(delimited by triple backticks): ```{goal}```"
+                       f"process the following text with specified goal"
+                       f"(delimited by triple backticks): ```{input_text}```")
+        asyncio.run(get_completion(full_prompt))
+        global last_response  # pylint: disable=global-statement
+        self.output_text.setPlainText(last_response)
 
     def load_goal(self):
         """ open a dialog inspecting text files on file system """
