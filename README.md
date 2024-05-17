@@ -11,6 +11,8 @@ OPENAI_API_KEY=<your-key>
 OPENAI_ORGANIZATION=<your-organizatio-or-personal-id>
 ```
 
+## Links:
+- [Where do I find openai api key](https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key)
 ## Usage
 Launch application with:
 
