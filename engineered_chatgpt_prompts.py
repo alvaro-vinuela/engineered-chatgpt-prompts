@@ -7,7 +7,7 @@ by the chatgpt model to generate the output text.
 import asyncio
 import os
 import sys
-import traceback
+
 import openai
 from dotenv import load_dotenv, find_dotenv
 from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
@@ -21,12 +21,12 @@ from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
 
 _ = load_dotenv(find_dotenv())  # read local .env file
 
-client = openai.AsyncOpenAI(
-    api_key=os.getenv('OPENAI_API_KEY'),
-    organization=os.getenv('OPENAI_ORGANIZATION'),
-)
+openai.api_key = os.getenv('OPENAI_API_KEY')
+openai.organization = os.getenv('OPENAI_ORGANIZATION')
 
 print("OpenAI version:", openai.__version__)
+last_response = "" # pylint: disable=invalid-name,redefined-outer-name
+
 
 
 # def get_completion(prompt, model="gpt-3.5-turbo"):
@@ -36,41 +36,23 @@ async def get_completion(prompt,
     method to query openai API
     """
     messages = [{"role": "user", "content": prompt}]
-    chat = None
-    try:
-        # chat = openai.ChatCompletion.create(
-        chat = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0,
-            stream=True,
-            # this is the randomness degree of the model's output
-        )
-
-    except openai.APIConnectionError as e:
-        print("The server could not be reached")
-        print(e.__cause__)  # an underlying Exception, likely raised within http
-    except openai.RateLimitError as e:
-        print("A 429 status code was received; we should back off a bit.")
-    except openai.APIStatusError as e:
-        print("Another non-200-range status code was received")
-        print(e.status_code)
-        print(e.response)
-        return None
-
-    response = ""
-    async for part in chat:
-        response += part.choices[0].delta.content or ""
-        sys.stdout.write(f"\r{response}>")
-        sys.stdout.flush()
-        # print(response)
-    return response
+    chat = openai.ChatCompletion.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+        # stream=True,
+        # this is the randomness degree of the model's output
+    )
+    global last_response  # pylint: disable=global-statement
+    last_response = chat.choices[0].message["content"]  # pylint: disable=invalid-name,redefined-outer-name
+    sys.stdout.write(f"\r{last_response}>")
+    sys.stdout.flush()
+    return last_response
 
 
-class EngineeredChatgptPrompts(
-    QWidget):  # pylint: disable=too-many-instance-attributes
+class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-attributes
     """
-    class to hold widgets and preocess method of main application
+    class to hold widgets and process method of main application
     """
 
     def __init__(self):
@@ -142,11 +124,13 @@ class EngineeredChatgptPrompts(
         # Perform processing on the input text (replace with your own logic)
         if len(goal) < 2:
             goal = "summarize in 2 sentence"
-        complete_prompt = (f"with the following goal "
-                           f"(delimited by triple backticks): ```{goal}```"
-                           f"process the following text with specified goal"
-                           f"(delimited by triple backticks): ```{input_text}```")
-        asyncio.run(get_completion(complete_prompt))
+        full_prompt = (f"with the following goal "
+                       f"(delimited by triple backticks): ```{goal}```"
+                       f"process the following text with specified goal"
+                       f"(delimited by triple backticks): ```{input_text}```")
+        asyncio.run(get_completion(full_prompt))
+        global last_response  # pylint: disable=global-statement
+        self.output_text.setPlainText(last_response)
 
     def load_goal(self):
         """ open a dialog inspecting text files on file system """
@@ -166,7 +150,10 @@ class EngineeredChatgptPrompts(
                                                '.',
                                                'Text Files (*.txt)')
         if filename[0]:
-            with open(filename[0], 'w', encoding='utf-8') as f:
+            file = filename[0]
+            if not filename[0].endswith('.txt'):
+                file += '.txt'
+            with open(file, 'w', encoding='utf-8') as f:
                 my_text = self.goal_text.toPlainText()
                 f.write(my_text)
 
