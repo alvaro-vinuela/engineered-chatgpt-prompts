@@ -4,6 +4,7 @@ chatgtp prompts. Using a specified goal, the input text is processed
 by the chatgpt model to generate the output text.
 """
 
+import argparse
 import asyncio
 import os
 import sys
@@ -25,8 +26,7 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 openai.organization = os.getenv('OPENAI_ORGANIZATION')
 
 print("OpenAI version:", openai.__version__)
-last_response = "" # pylint: disable=invalid-name,redefined-outer-name
-
+last_response = ""  # pylint: disable=invalid-name,redefined-outer-name
 
 
 # def get_completion(prompt, model="gpt-3.5-turbo"):
@@ -44,13 +44,67 @@ async def get_completion(prompt,
         # this is the randomness degree of the model's output
     )
     global last_response  # pylint: disable=global-statement
-    last_response = chat.choices[0].message["content"]  # pylint: disable=invalid-name,redefined-outer-name
+    last_response = chat.choices[0].message[
+        "content"]  # pylint: disable=invalid-name,redefined-outer-name
     sys.stdout.write(f"\r{last_response}>")
     sys.stdout.flush()
     return last_response
 
 
-class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-attributes
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description='Launch engineered chatgtp prompts tool '
+                    'on graphical or command line mode.\n\n'
+                    'Example processing a directory in batch mode:\n'
+                    '  python engineered_chatgtp_prompts.py'
+                    ' --directory="/path/to/directory"'
+                    ' --goal="/path/to/goal"'
+                    '\n\n'
+                    'Example processing a file in batch mode:\n'
+                    '  python engineered_chatgtp_prompts.py'
+                    ' --file="/path/to/file"'
+                    ' --goal="${PWD}/goals/general/summarize.txt"'
+                    '\n\n'
+                    'Example Launching it on graphical mode:\n'
+                    '  python engineered_chatgtp_prompts.py ',
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-d', "--dir", required=False,
+                        dest='dir',
+                        default=None, type=str,
+                        help="dir to process")
+    parser.add_argument('-f', "--file", required=False,
+                        dest='file',
+                        default=None, type=str,
+                        help="file to process")
+    parser.add_argument('-g', "--goal", required=False,
+                        dest='goal',
+                        default=None, type=str,
+                        help="goal to do on directory")
+    args_namespace = parser.parse_args()
+    if hasattr(args_namespace, 'help'):
+        parser.print_help()
+        exit(0)
+    return args_namespace
+
+
+def check_arguments(_args: argparse.Namespace):
+    """
+    verify that provided arguments are correct
+    :param _args:
+        input arguments parser
+    :return:
+         void
+    """
+    if _args.dir is not None and _args.file is not None:
+        raise Exception("Directory and file arguments are exclusive")
+    if _args.dir is not None or _args.file is not None:
+        if _args.goal is None:
+            raise Exception("Goal argument is required when "
+                            "directory or file is provided")
+
+
+class EngineeredChatgptPrompts(
+    QWidget):  # pylint: disable=too-many-instance-attributes
     """
     class to hold widgets and process method of main application
     """
@@ -167,6 +221,13 @@ class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-at
 
 
 if __name__ == '__main__':
-    app = QApplication([])
-    window = EngineeredChatgptPrompts()
-    app.exec_()
+    args = parse_arguments()
+    check_arguments(args)
+    if args.dir is not None:
+        print(f"Processing directory: {args.dir}\nwith goal: {args.goal}")
+    elif args.file is not None:
+        print(f"Processing file: {args.file}\nwith goal: {args.goal}")
+    else:
+        app = QApplication([])
+        window = EngineeredChatgptPrompts()
+        app.exec_()
