@@ -21,17 +21,22 @@ from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
                              QPushButton)
 
 _ = load_dotenv(find_dotenv())  # read local .env file
+# default_openai_model = "gpt-4o"
+default_openai_model = "gpt-3.5-turbo"
+# default_openai_model = "text-embedding-3-small"
+# default_openai_model = "text-embedding-3-large"
+# default_openai_model = "gpt-4-1106-vision-preview"
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 openai.organization = os.getenv('OPENAI_ORGANIZATION')
+openai.project = os.getenv('OPENAI_PROJECT')
 
 print("OpenAI version:", openai.__version__)
 last_response = ""  # pylint: disable=invalid-name,redefined-outer-name
 
 
-# def get_completion(prompt, model="gpt-3.5-turbo"):
 async def get_completion(prompt,
-                         model="gpt-3.5-turbo"):
+                         model=default_openai_model):
     """
     method to query openai API
     """
@@ -101,6 +106,49 @@ def check_arguments(_args: argparse.Namespace):
         if _args.goal is None:
             raise Exception("Goal argument is required when "
                             "directory or file is provided")
+
+
+def process_file(file: str, goal: str):
+    """
+    process a file with a goal
+    :param file:
+        file to process
+    :param goal:
+        goal to process
+    :return:
+        void
+    """
+    with open(file, 'r', encoding='utf-8') as f:
+        file_text = f.read()
+        full_prompt = (f"with the following goal "
+                       f"(delimited by triple backticks): ```{goal}```"
+                       f"process the following text with specified goal"
+                       f"(delimited by triple backticks): ```{file_text}```")
+        asyncio.run(get_completion(full_prompt))
+        print(last_response)
+
+
+def process_directory(directory: str, goal: str):
+    """
+    process a directory with a goal
+    :param directory:
+        directory to process
+    :param goal:
+        goal to process
+    :return:
+        void
+    """
+    import subprocess
+    import time
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+        timestamp = str(int(time.time()))
+        temp_file_name = temp_file.name
+        temp_file.close()
+        subprocess.run(
+            ['bash', 'utils/serialize_dir.sh', directory, temp_file_name])
+        process_file(temp_file_name, goal)
+        os.remove(temp_file_name)
 
 
 class EngineeredChatgptPrompts(
@@ -225,7 +273,9 @@ if __name__ == '__main__':
     check_arguments(args)
     if args.dir is not None:
         print(f"Processing directory: {args.dir}\nwith goal: {args.goal}")
+        process_directory(args.dir, args.goal)
     elif args.file is not None:
+        process_file(args.file, args.goal)
         print(f"Processing file: {args.file}\nwith goal: {args.goal}")
     else:
         app = QApplication([])
