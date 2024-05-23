@@ -76,15 +76,21 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('-d', "--dir", required=False,
                         dest='dir',
                         default=None, type=str,
-                        help="dir to process")
+                        help="full path to directory to process")
     parser.add_argument('-f', "--file", required=False,
                         dest='file',
                         default=None, type=str,
-                        help="file to process")
+                        help="full path to file to process")
     parser.add_argument('-g', "--goal", required=False,
                         dest='goal',
                         default=None, type=str,
-                        help="goal to do on directory")
+                        help="relative file path to goal file in"
+                             " ./goals directory")
+    parser.add_argument('-t', "--filter", required=False,
+                        dest='ffilter',
+                        default="", type=str,
+                        help="relative file path to filter file in"
+                             " ./utils/file_filters directory")
     args_namespace = parser.parse_args()
     if hasattr(args_namespace, 'help'):
         parser.print_help()
@@ -106,6 +112,29 @@ def check_arguments(_args: argparse.Namespace):
         if _args.goal is None:
             raise Exception("Goal argument is required when "
                             "directory or file is provided")
+        else:
+            goal_file = full_path_goal(_args.goal)
+            if not os.path.exists(goal_file):
+                raise Exception(f"Goal file does not exist: {goal_file}")
+            if len(_args.ffilter) != 0:
+                filter_file = full_path_filter(_args.ffilter)
+                print(f"Filter file: {filter_file}")
+                if not os.path.exists(filter_file):
+                    raise Exception(f"Filter file does not exist: {filter_file}")
+    if _args.dir is not None:
+        if not os.path.exists(_args.dir):
+            raise Exception(f"Directory does not exist: {_args.dir}")
+    if _args.file is not None:
+        if not os.path.exists(_args.file):
+            raise Exception(f"File does not exist: {_args.file}")
+
+
+def full_path_goal(input: str):
+    return f"goals/{input}"
+
+
+def full_path_filter(input: str):
+    return f"utils/file_filters/{input}"
 
 
 def process_file(file: str, goal: str):
@@ -119,11 +148,11 @@ def process_file(file: str, goal: str):
         void
     """
     with open(file, 'r', encoding='utf-8') as f:
-        gf = open(goal, 'r', encoding='utf-8')
+        gf = open(full_path_goal(goal), 'r', encoding='utf-8')
         goal_text = gf.read()
         gf.close()
         file_text = f.read()
-        print(f"Processing file: {file}\nwith goal: {goal_text}")
+        print(f"sending to openai file: {file} with goal:\n{goal_text}")
         full_prompt = (f"with the following goal "
                        f"(delimited by triple backticks): ```{goal_text}```"
                        f"process the following text with specified goal"
@@ -132,7 +161,7 @@ def process_file(file: str, goal: str):
         print(last_response)
 
 
-def process_directory(dir: str, goal: str):
+def process_directory(dir: str, goal: str, ffilter: str = ""):
     """
     process a directory with a goal
     :param directory:
@@ -145,12 +174,13 @@ def process_directory(dir: str, goal: str):
     import subprocess
     import time
     import tempfile
-    # ffilter = "is_cc_report_processable_file.sh"
-    ffilter = "has_timestamp.sh"
+    # ffilter = "has_timestamp.sh"
     with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
         timestamp = str(int(time.time()))
         temp_file_name = temp_file.name
         temp_file.close()
+        print(f"Executing: ./utils/serialize_dir.sh"
+              f" {dir} {temp_file_name} {ffilter}")
         subprocess.run(
             ['bash', 'utils/serialize_dir.sh', dir, temp_file_name, ffilter])
         process_file(temp_file_name, goal)
@@ -279,7 +309,7 @@ if __name__ == '__main__':
     check_arguments(args)
     if args.dir is not None:
         print(f"Processing directory: {args.dir}\nwith goal: {args.goal}")
-        process_directory(args.dir, args.goal)
+        process_directory(args.dir, args.goal, args.ffilter)
     elif args.file is not None:
         process_file(args.file, args.goal)
         print(f"Processing file: {args.file}\nwith goal: {args.goal}")

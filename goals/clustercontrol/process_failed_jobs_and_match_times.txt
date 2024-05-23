@@ -1,0 +1,4 @@
+Determine job files with 'FAILED' status (with 'FAILED' on its name) and analyze what are the errors on job and the events logged before the error. With those timestamps check what happened on other files correlating them by the same moment.
+Take into account that provided text has begin and end labels to determine directory and file content ('<dir: directory_name>' and '</dir: directory_name>' and for files '<file: file_name>' and '</file: file_name>')
+
+

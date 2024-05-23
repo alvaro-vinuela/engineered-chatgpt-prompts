@@ -19,6 +19,7 @@ filter=$3
 # Function to process directories and files
 process_directory() {
     local dir_path=$1
+    # echo "Processing directory: $dir_path"
 
     # Add directory start label
     echo "<dir: $dir_path>" >> "$output_file"
@@ -29,6 +30,13 @@ process_directory() {
             # Recursively process directories
             process_directory "$item"
         elif [ -f "$item" ]; then
+            # process only text files
+            # shellcheck disable=SC2091
+            $("${PATH}/${file_filter_folder}/is_text.sh" "$item")
+            if [ $? -ne 0 ]; then
+                # echo "Skipping binary file: $item"
+                continue
+            fi
             # execute filter script and check return value is 0
             if [ -n "$filter" ]; then
                 # echo "${PATH}/${file_filter_folder}/${filter}" "$item"
@@ -38,7 +46,7 @@ process_directory() {
                     continue
                 fi
             fi
-            # echo "Processing file: $item"
+            echo "Adding content of file: $item"
             # Add file start label
             echo "" >> "$output_file"
             echo "<file: $item>" >> "$output_file"
