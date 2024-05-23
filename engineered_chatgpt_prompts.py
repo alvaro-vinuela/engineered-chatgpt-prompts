@@ -4,6 +4,7 @@ chatgtp prompts. Using a specified goal, the input text is processed
 by the chatgpt model to generate the output text.
 """
 
+import argparse
 import asyncio
 import os
 import sys
@@ -20,18 +21,22 @@ from PyQt5.QtWidgets import (QApplication,  # pylint: disable=no-name-in-module
                              QPushButton)
 
 _ = load_dotenv(find_dotenv())  # read local .env file
+# default_openai_model = "gpt-4o"
+default_openai_model = "gpt-3.5-turbo"
+# default_openai_model = "text-embedding-3-small"
+# default_openai_model = "text-embedding-3-large"
+# default_openai_model = "gpt-4-1106-vision-preview"
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 openai.organization = os.getenv('OPENAI_ORGANIZATION')
+openai.project = os.getenv('OPENAI_PROJECT')
 
 print("OpenAI version:", openai.__version__)
-last_response = "" # pylint: disable=invalid-name,redefined-outer-name
+last_response = ""  # pylint: disable=invalid-name,redefined-outer-name
 
 
-
-# def get_completion(prompt, model="gpt-3.5-turbo"):
 async def get_completion(prompt,
-                         model="gpt-3.5-turbo"):
+                         model=default_openai_model):
     """
     method to query openai API
     """
@@ -44,13 +49,146 @@ async def get_completion(prompt,
         # this is the randomness degree of the model's output
     )
     global last_response  # pylint: disable=global-statement
-    last_response = chat.choices[0].message["content"]  # pylint: disable=invalid-name,redefined-outer-name
+    last_response = chat.choices[0].message[
+        "content"]  # pylint: disable=invalid-name,redefined-outer-name
     sys.stdout.write(f"\r{last_response}>")
     sys.stdout.flush()
     return last_response
 
 
-class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-attributes
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description='Launch engineered chatgtp prompts tool '
+                    'on graphical or command line mode.\n\n'
+                    'Example processing a directory in batch mode:\n'
+                    '  python engineered_chatgtp_prompts.py'
+                    ' --directory="/path/to/directory"'
+                    ' --goal="/path/to/goal"'
+                    '\n\n'
+                    'Example processing a file in batch mode:\n'
+                    '  python engineered_chatgtp_prompts.py'
+                    ' --file="/path/to/file"'
+                    ' --goal="${PWD}/goals/general/summarize.txt"'
+                    '\n\n'
+                    'Example Launching it on graphical mode:\n'
+                    '  python engineered_chatgtp_prompts.py ',
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-d', "--dir", required=False,
+                        dest='dir',
+                        default=None, type=str,
+                        help="full path to directory to process")
+    parser.add_argument('-f', "--file", required=False,
+                        dest='file',
+                        default=None, type=str,
+                        help="full path to file to process")
+    parser.add_argument('-g', "--goal", required=False,
+                        dest='goal',
+                        default=None, type=str,
+                        help="relative file path to goal file in"
+                             " ./goals directory")
+    parser.add_argument('-t', "--filter", required=False,
+                        dest='ffilter',
+                        default="", type=str,
+                        help="relative file path to filter file in"
+                             " ./utils/file_filters directory")
+    args_namespace = parser.parse_args()
+    if hasattr(args_namespace, 'help'):
+        parser.print_help()
+        exit(0)
+    return args_namespace
+
+
+def check_arguments(_args: argparse.Namespace):
+    """
+    verify that provided arguments are correct
+    :param _args:
+        input arguments parser
+    :return:
+         void
+    """
+    if _args.dir is not None and _args.file is not None:
+        raise Exception("Directory and file arguments are exclusive")
+    if _args.dir is not None or _args.file is not None:
+        if _args.goal is None:
+            raise Exception("Goal argument is required when "
+                            "directory or file is provided")
+        else:
+            goal_file = full_path_goal(_args.goal)
+            if not os.path.exists(goal_file):
+                raise Exception(f"Goal file does not exist: {goal_file}")
+            if len(_args.ffilter) != 0:
+                filter_file = full_path_filter(_args.ffilter)
+                print(f"Filter file: {filter_file}")
+                if not os.path.exists(filter_file):
+                    raise Exception(f"Filter file does not exist: {filter_file}")
+    if _args.dir is not None:
+        if not os.path.exists(_args.dir):
+            raise Exception(f"Directory does not exist: {_args.dir}")
+    if _args.file is not None:
+        if not os.path.exists(_args.file):
+            raise Exception(f"File does not exist: {_args.file}")
+
+
+def full_path_goal(input: str):
+    return f"goals/{input}"
+
+
+def full_path_filter(input: str):
+    return f"utils/file_filters/{input}"
+
+
+def process_file(file: str, goal: str):
+    """
+    process a file with a goal
+    :param file:
+        file to process
+    :param goal:
+        goal to process
+    :return:
+        void
+    """
+    with open(file, 'r', encoding='utf-8') as f:
+        gf = open(full_path_goal(goal), 'r', encoding='utf-8')
+        goal_text = gf.read()
+        gf.close()
+        file_text = f.read()
+        print(f"sending to openai file: {file} with goal:\n{goal_text}")
+        full_prompt = (f"with the following goal "
+                       f"(delimited by triple backticks): ```{goal_text}```"
+                       f"process the following text with specified goal"
+                       f"(delimited by triple backticks): ```{file_text}```")
+        asyncio.run(get_completion(full_prompt))
+        print(last_response)
+
+
+def process_directory(dir: str, goal: str, ffilter: str = ""):
+    """
+    process a directory with a goal
+    :param directory:
+        directory to process
+    :param goal:
+        goal to process
+    :return:
+        void
+    """
+    import subprocess
+    import time
+    import tempfile
+    # ffilter = "has_timestamp.sh"
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+        timestamp = str(int(time.time()))
+        temp_file_name = temp_file.name
+        temp_file.close()
+        print(f"Executing: ./utils/serialize_dir.sh"
+              f" {dir} {temp_file_name} {ffilter}")
+        subprocess.run(
+            ['bash', 'utils/serialize_dir.sh', dir, temp_file_name, ffilter])
+        process_file(temp_file_name, goal)
+        os.remove(temp_file_name)
+
+
+class EngineeredChatgptPrompts(
+    QWidget):  # pylint: disable=too-many-instance-attributes
     """
     class to hold widgets and process method of main application
     """
@@ -167,6 +305,15 @@ class EngineeredChatgptPrompts(QWidget):  # pylint: disable=too-many-instance-at
 
 
 if __name__ == '__main__':
-    app = QApplication([])
-    window = EngineeredChatgptPrompts()
-    app.exec_()
+    args = parse_arguments()
+    check_arguments(args)
+    if args.dir is not None:
+        print(f"Processing directory: {args.dir}\nwith goal: {args.goal}")
+        process_directory(args.dir, args.goal, args.ffilter)
+    elif args.file is not None:
+        process_file(args.file, args.goal)
+        print(f"Processing file: {args.file}\nwith goal: {args.goal}")
+    else:
+        app = QApplication([])
+        window = EngineeredChatgptPrompts()
+        app.exec_()
