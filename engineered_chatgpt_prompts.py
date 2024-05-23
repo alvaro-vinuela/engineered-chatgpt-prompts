@@ -119,16 +119,20 @@ def process_file(file: str, goal: str):
         void
     """
     with open(file, 'r', encoding='utf-8') as f:
+        gf = open(goal, 'r', encoding='utf-8')
+        goal_text = gf.read()
+        gf.close()
         file_text = f.read()
+        print(f"Processing file: {file}\nwith goal: {goal_text}")
         full_prompt = (f"with the following goal "
-                       f"(delimited by triple backticks): ```{goal}```"
+                       f"(delimited by triple backticks): ```{goal_text}```"
                        f"process the following text with specified goal"
                        f"(delimited by triple backticks): ```{file_text}```")
         asyncio.run(get_completion(full_prompt))
         print(last_response)
 
 
-def process_directory(directory: str, goal: str):
+def process_directory(dir: str, goal: str):
     """
     process a directory with a goal
     :param directory:
@@ -141,12 +145,14 @@ def process_directory(directory: str, goal: str):
     import subprocess
     import time
     import tempfile
+    # ffilter = "is_cc_report_processable_file.sh"
+    ffilter = "has_timestamp.sh"
     with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
         timestamp = str(int(time.time()))
         temp_file_name = temp_file.name
         temp_file.close()
         subprocess.run(
-            ['bash', 'utils/serialize_dir.sh', directory, temp_file_name])
+            ['bash', 'utils/serialize_dir.sh', dir, temp_file_name, ffilter])
         process_file(temp_file_name, goal)
         os.remove(temp_file_name)
 

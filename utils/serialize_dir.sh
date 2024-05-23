@@ -1,14 +1,17 @@
 #!/bin/bash
 
 # Check if the correct number of arguments are provided
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <directory_to_process> <output_file>"
+if [ "$#" -ne 2 ] && [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <directory_to_process> <output_file> [filter]"
     exit 1
 fi
 
+file_filter_folder="file_filters"
+PATH=$(dirname "$(realpath "$0")")
 # Assign arguments to variables
 start_directory=$1
 output_file=$2
+filter=$3
 
 # Empty the output file if it exists
 > "$output_file"
@@ -25,12 +28,22 @@ process_directory() {
         if [ -d "$item" ]; then
             # Recursively process directories
             process_directory "$item"
-        elif [ -f "$item" ] && [[ "$item" == *.txt ]]; then
+        elif [ -f "$item" ]; then
+            # execute filter script and check return value is 0
+            if [ -n "$filter" ]; then
+                # echo "${PATH}/${file_filter_folder}/${filter}" "$item"
+                $("${PATH}/${file_filter_folder}/${filter}" "$item")
+                if [ $? -ne 0 ]; then
+                    # echo "Skipping file: $item"
+                    continue
+                fi
+            fi
+            # echo "Processing file: $item"
             # Add file start label
             echo "" >> "$output_file"
             echo "<file: $item>" >> "$output_file"
             # Append file content
-            cat "$item" >> "$output_file"
+            /usr/bin/cat "$item" >> "$output_file"
             # Add file end label
             echo "" >> "$output_file"
             echo "</file: $item>" >> "$output_file"
